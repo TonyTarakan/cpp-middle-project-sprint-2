@@ -2,23 +2,29 @@
 
 #include <string>
 #include <tuple>
+
 namespace stdx::details {
 
-// Класс для хранения ошибки неуспешного сканирования
-
+//
+// Хранит строку ошибки сканирования.
+//
 struct scan_error {
     std::string message;
 };
 
+//
 // Шаблонный класс для хранения результатов успешного сканирования
-
+//
+// Поле типа std::tuple - для готовых сканированных значений
+// Метод values для удобного доступа к сканированным значениям.
+//
 template <typename... Ts>
 struct scan_result {
-    // здесь ваш код
-    std::tuple<Ts...> values() const { return values_; }
 
-private:
-    std::tuple<Ts...> values_;
+    std::tuple<Ts...> data;
+
+    auto values() { return data; }
+    const auto values() const { return data; }
 };
 
 }  // namespace stdx::details
