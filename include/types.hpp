@@ -23,8 +23,8 @@ struct scan_result {
 
     std::tuple<Ts...> data;
 
-    auto values() { return data; }
-    const auto values() const { return data; }
+    auto &values() { return data; }
+    const auto &values() const { return data; }
 };
 
 }  // namespace stdx::details

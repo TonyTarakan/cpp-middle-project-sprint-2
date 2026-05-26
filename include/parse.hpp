@@ -12,7 +12,6 @@
 
 namespace stdx::details {
 
-// здесь ваш код
 constexpr std::string_view FMT_INT{"d"};
 constexpr std::string_view FMT_UNSIGNED{"u"};
 constexpr std::string_view FMT_FLOATING{"f"};
@@ -22,8 +21,11 @@ constexpr std::string_view FMT_STRING{"s"};
 // Семейство функций parse_value, конвертирующих подстроку исходных данных в конкретный тип.
 //
 template <typename T>
+    requires(std::integral<std::remove_cvref_t<T>> || std::floating_point<std::remove_cvref_t<T>>)
 std::expected<T, scan_error> parse_value(std::string_view sv) {
-    T value{};
+    using RawT = std::remove_cvref_t<T>;
+
+    RawT value{};
 
     auto [_, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
 
@@ -44,28 +46,36 @@ std::expected<T, scan_error> parse_value(std::string_view sv) {
 //
 template <typename T>
 std::expected<T, scan_error> parse_value_with_format(std::string_view input, std::string_view fmt) {
+    using RawT = std::remove_cvref_t<T>;
 
-    if constexpr (std::signed_integral<T>) {
+    if constexpr (std::signed_integral<RawT>) {
         if (fmt != FMT_INT)
             return std::unexpected{scan_error{"Signed integral format mismatch"}};
+        return parse_value<RawT>(input);
 
-    } else if constexpr (std::unsigned_integral<T>) {
+    } else if constexpr (std::unsigned_integral<RawT>) {
         if (fmt != FMT_UNSIGNED)
             return std::unexpected{scan_error{"Unsigned integral format mismatch"}};
+        return parse_value<RawT>(input);
 
-    } else if constexpr (std::floating_point<T>) {
+    } else if constexpr (std::floating_point<RawT>) {
         if (fmt != FMT_FLOATING)
             return std::unexpected{scan_error{"Floating point format mismatch"}};
+        return parse_value<RawT>(input);
 
-    } else if constexpr (std::same_as<T, std::string>) {
+    } else if constexpr (std::same_as<RawT, std::string>) {
         if (fmt != FMT_STRING)
             return std::unexpected{scan_error{"String format mismatch"}};
+        return std::string{input};
+
+    } else if constexpr (std::same_as<RawT, std::string_view>) {
+        if (fmt != FMT_STRING)
+            return std::unexpected{scan_error{"String format mismatch"}};
+        return std::string_view{input};
 
     } else {
-        return std::unexpected("Format mismatch");
+        return std::unexpected{scan_error{"Format mismatch"}};
     }
-
-    return parse_value<T>(input);
 }
 
 //
@@ -96,7 +106,7 @@ parse_sources(std::string_view input, std::string_view format) {
         // проверяем его наличие во входной строке
         if (open > start) {
             std::string_view between = format.substr(start, open - start);
-            auto pos = input.find(between);
+            const auto pos = input.find(between);
             if (input.size() < between.size() || pos == std::string_view::npos) {
                 return std::unexpected(scan_error{"Unformatted text in input and format string are different"});
             }
@@ -114,8 +124,8 @@ parse_sources(std::string_view input, std::string_view format) {
 
     // Проверяем оставшийся текст после последней }
     if (start < format.size()) {
-        std::string_view remaining_format = format.substr(start);
-        auto pos = input.find(remaining_format);
+        const std::string_view remaining_format = format.substr(start);
+        const auto pos = input.find(remaining_format);
         if (input.size() < remaining_format.size() || pos == std::string_view::npos) {
             return std::unexpected(scan_error{"Unformatted text in input and format string are different"});
         }
