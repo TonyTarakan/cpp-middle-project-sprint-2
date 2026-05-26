@@ -1,5 +1,7 @@
 #pragma once
 
+#include <charconv>
+#include <concepts>
 #include <expected>
 #include <string>
 #include <string_view>
@@ -10,15 +12,80 @@
 
 namespace stdx::details {
 
-// здесь ваш код
+constexpr std::string_view FMT_INT{"d"};
+constexpr std::string_view FMT_UNSIGNED{"u"};
+constexpr std::string_view FMT_FLOATING{"f"};
+constexpr std::string_view FMT_STRING{"s"};
 
-// Функция для парсинга значения с учетом спецификатора формата
+//
+// Семейство функций parse_value, конвертирующих подстроку исходных данных в конкретный тип.
+//
 template <typename T>
-std::expected<T, scan_error> parse_value_with_format(std::string_view input, std::string_view fmt) {
-    // здесь ваш код
+    requires(std::integral<std::remove_cvref_t<T>> || std::floating_point<std::remove_cvref_t<T>>)
+std::expected<T, scan_error> parse_value(std::string_view sv) {
+    using RawT = std::remove_cvref_t<T>;
+
+    RawT value{};
+
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
+
+    if (ec != std::errc{} || ptr != sv.data() + sv.size())
+        return std::unexpected(scan_error{"parse failed"});
+
+    return value;
 }
 
+//
+// Функция для парсинга значения с учетом спецификатора формата
+//
+// Инкапсулирует всю логику преобразования подстроки исходных данных
+// в конкретный тип на основе спецификатора конвертации.
+//
+// Возвращает ошибку scan_error в случае
+// несоответствия переданного типа и спецификатора конвертации.
+//
+template <typename T>
+std::expected<T, scan_error> parse_value_with_format(std::string_view input, std::string_view fmt) {
+    using RawT = std::remove_cvref_t<T>;
+
+    if constexpr (std::signed_integral<RawT>) {
+        if (fmt != FMT_INT)
+            return std::unexpected{scan_error{"Signed integral format mismatch"}};
+        return parse_value<RawT>(input);
+
+    } else if constexpr (std::unsigned_integral<RawT>) {
+        if (fmt != FMT_UNSIGNED)
+            return std::unexpected{scan_error{"Unsigned integral format mismatch"}};
+        return parse_value<RawT>(input);
+
+    } else if constexpr (std::floating_point<RawT>) {
+        if (fmt != FMT_FLOATING)
+            return std::unexpected{scan_error{"Floating point format mismatch"}};
+        return parse_value<RawT>(input);
+
+    } else if constexpr (std::same_as<RawT, std::string>) {
+        if (fmt != FMT_STRING)
+            return std::unexpected{scan_error{"String format mismatch"}};
+        return std::string{input};
+
+    } else if constexpr (std::same_as<RawT, std::string_view>) {
+        if (fmt != FMT_STRING)
+            return std::unexpected{scan_error{"String format mismatch"}};
+        return std::string_view{input};
+
+    } else {
+        return std::unexpected{scan_error{"Format mismatch"}};
+    }
+}
+
+//
 // Функция для проверки корректности входных данных и выделения из обеих строк интересующих данных для парсинга
+//
+// Возвращает пару массивов подстрок форматирующей и исходной строки.
+//
+// Элементы массивов с одинаковыми индексами соответствуют
+// плейсхолдеру в форматирующей строке и релевантной ему подстроке в строке с исходными данными.
+//
 template <typename... Ts>
 std::expected<std::pair<std::vector<std::string_view>, std::vector<std::string_view>>, scan_error>
 parse_sources(std::string_view input, std::string_view format) {
@@ -39,7 +106,7 @@ parse_sources(std::string_view input, std::string_view format) {
         // проверяем его наличие во входной строке
         if (open > start) {
             std::string_view between = format.substr(start, open - start);
-            auto pos = input.find(between);
+            const auto pos = input.find(between);
             if (input.size() < between.size() || pos == std::string_view::npos) {
                 return std::unexpected(scan_error{"Unformatted text in input and format string are different"});
             }
@@ -57,8 +124,8 @@ parse_sources(std::string_view input, std::string_view format) {
 
     // Проверяем оставшийся текст после последней }
     if (start < format.size()) {
-        std::string_view remaining_format = format.substr(start);
-        auto pos = input.find(remaining_format);
+        const std::string_view remaining_format = format.substr(start);
+        const auto pos = input.find(remaining_format);
         if (input.size() < remaining_format.size() || pos == std::string_view::npos) {
             return std::unexpected(scan_error{"Unformatted text in input and format string are different"});
         }
@@ -70,4 +137,4 @@ parse_sources(std::string_view input, std::string_view format) {
     return std::pair{format_parts, input_parts};
 }
 
-} // namespace stdx::details
+}  // namespace stdx::details
