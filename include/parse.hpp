@@ -27,9 +27,9 @@ std::expected<T, scan_error> parse_value(std::string_view sv) {
 
     RawT value{};
 
-    auto [_, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
 
-    if (ec != std::errc{})
+    if (ec != std::errc{} || ptr != sv.data() + sv.size())
         return std::unexpected(scan_error{"parse failed"});
 
     return value;

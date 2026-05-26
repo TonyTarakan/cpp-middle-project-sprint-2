@@ -3,13 +3,14 @@
 #include "parse.hpp"
 #include "types.hpp"
 #include <expected>
+#include <optional>
 #include <tuple>
 #include <utility>
 
 namespace stdx::details {
 
 template <typename... Ts, size_t... Is>
-std::expected<std::tuple<Ts...>, scan_error> tuple_maker(const std::vector<std::string_view> &values,
+std::expected<std::tuple<Ts...>, scan_error> parse_tuple(const std::vector<std::string_view> &values,
                                                          const std::vector<std::string_view> &formats,
                                                          std::index_sequence<Is...>) {
 
@@ -20,13 +21,16 @@ std::expected<std::tuple<Ts...>, scan_error> tuple_maker(const std::vector<std::
     auto vals_and_errs =
         std::tuple<std::expected<Ts, scan_error>...>{parse_value_with_format<Ts>(values[Is], formats[Is])...};
 
-    // Get the first error to pass it further
-    scan_error *first_err = nullptr;
-    auto capture_first_error = [&](auto &r) {
-        if (!first_err && !r.has_value())
-            first_err = &r.error();
+    // Get the first error to pass it further:
+
+    std::optional<scan_error> first_err;
+    auto capture_first_error = [&](auto &val_exp) {
+        if (!first_err && !val_exp)
+            first_err = val_exp.error();
     };
+
     (capture_first_error(std::get<Is>(vals_and_errs)), ...);
+
     if (first_err)
         return std::unexpected{*first_err};
 
@@ -65,7 +69,7 @@ std::expected<details::scan_result<Ts...>, details::scan_error> scan(std::string
 
     const auto &[formats, values] = parsed.value();
 
-    const auto result = tuple_maker<Ts...>(values, formats, std::index_sequence_for<Ts...>{});
+    const auto result = parse_tuple<Ts...>(values, formats, std::index_sequence_for<Ts...>{});
     if (!result)
         return std::unexpected{result.error()};
 
