@@ -22,10 +22,10 @@ std::expected<std::tuple<Ts...>, scan_error> parse_tuple(const std::vector<std::
 
     // Get the first error to pass it further:
 
-    std::optional<scan_error> first_err;
-    auto capture_first_error = [&](auto &val_exp) {
-        if (!first_err && !val_exp)
-            first_err = val_exp.error();
+    std::optional<scan_error> first_err{};
+    auto capture_first_error = [&first_err](const auto &expected_val) {
+        if (!expected_val && !first_err)
+            first_err = expected_val.error();
     };
 
     (capture_first_error(std::get<Is>(vals_and_errs)), ...);
