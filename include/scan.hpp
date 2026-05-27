@@ -18,8 +18,7 @@ std::expected<std::tuple<Ts...>, scan_error> parse_tuple(const std::vector<std::
         return std::unexpected(scan_error{"Unexpected parsed data length"});
 
     // Parse all, get all errors
-    auto vals_and_errs =
-        std::tuple<std::expected<Ts, scan_error>...>{parse_value_with_format<Ts>(values[Is], formats[Is])...};
+    auto vals_and_errs = std::tuple{parse_value_with_format<Ts>(values[Is], formats[Is])...};
 
     // Get the first error to pass it further:
 
@@ -34,7 +33,7 @@ std::expected<std::tuple<Ts...>, scan_error> parse_tuple(const std::vector<std::
     if (first_err)
         return std::unexpected{*first_err};
 
-    return std::tuple<Ts...>{(*std::get<Is>(vals_and_errs))...};
+    return std::tuple{std::get<Is>(vals_and_errs).value()...};
 }
 
 }  // namespace stdx::details
@@ -73,7 +72,7 @@ std::expected<details::scan_result<Ts...>, details::scan_error> scan(std::string
     if (!result)
         return std::unexpected{result.error()};
 
-    return scan_result<Ts...>{*result};
+    return scan_result<Ts...>{result.value()};
 }
 
 }  // namespace stdx
